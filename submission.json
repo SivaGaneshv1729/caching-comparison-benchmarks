@@ -1,0 +1,12 @@
+{
+  "benchmarks": {
+    "redis_ops_p1": 76480.39,
+    "memcached_ops_p1": 53727.75,
+    "redis_p99_ms": 0.415,
+    "memcached_p99_ms": 0.687
+  },
+  "consistency": {
+    "memcached_lost_increments_no_lock": 1000,
+    "memcached_lost_increments_with_lock": 0
+  }
+}
