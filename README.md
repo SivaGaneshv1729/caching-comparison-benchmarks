@@ -2,6 +2,12 @@
 
 A high-performance product catalog API proxying requests to **Redis 7** and **Memcached 1.6**, implementing advanced caching patterns, distributed locking, pub/sub invalidation, rate-limiting, and microservice benchmarking.
 
+## 📚 Dedicated Documentation
+For detailed insights, please refer to the dedicated documentation files:
+- [Architecture & Design](docs/architecture.md)
+- [API Endpoints](docs/api.md)
+- [Benchmark & Performance Findings](docs/benchmarks.md)
+
 ---
 
 ## 📊 Memory Comparison
