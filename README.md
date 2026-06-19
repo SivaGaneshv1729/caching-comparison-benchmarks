@@ -23,9 +23,38 @@ Below is the reported memory usage and overhead for storing **100,000 product ob
 ### 1. Backend Strategy Switching
 The proxy checks the incoming request's `X-Cache-Backend` header. If it is `redis`, the application targets Redis; if `memcached`, it routes to Memcached.
 
+```mermaid
+graph TD
+    Client(Client Request) --> Proxy[Node.js Proxy API]
+    Proxy -- "X-Cache-Backend: redis" --> Redis[(Redis 7)]
+    Proxy -- "X-Cache-Backend: memcached" --> Memcached[(Memcached 1.6)]
+    Redis -- "Cache Miss" --> DB[(PostgreSQL 15)]
+    Memcached -- "Cache Miss" --> DB
+```
+
 ### 2. Leaderboard view updates
 - **Redis**: Uses Sorted Sets (`ZSET`) via native atomic `ZINCRBY` commands. Sorting is offloaded to the database engine and executed in $O(\log N)$ time.
 - **Memcached**: Memcached is a flat key-value store and does not support sorting. The leaderboard is managed as a serialized JSON list of items. To prevent race conditions during the *Read -> Modify -> Write* sequence, we implemented a distributed locking pattern using the atomic `add` command (set if not exists) with exponential backoff retries.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as Node API
+    participant M as Memcached
+    C->>API: POST /api/products/:id/view
+    loop Exponential Backoff Retry
+        API->>M: ADD lock:leaderboard (atomic)
+        alt Lock Acquired
+            API->>M: GET leaderboard
+            API->>API: Parse JSON & Increment View
+            API->>M: SET leaderboard (JSON)
+            API->>M: DELETE lock:leaderboard
+        else Lock Exists
+            API->>API: Wait (Backoff)
+        end
+    end
+    API-->>C: 200 OK
+```
 
 ### 3. Rate Limiter (100 req/min)
 - **Redis**: Employs an atomic Lua script executing `INCR` and conditional `EXPIRE` in a single network round-trip.
@@ -80,3 +109,17 @@ Run local concurrency stress tests:
 npm run race-test
 ```
 This updates the final `submission.json` output file.
+
+### 4. Testing Endpoints Manually
+**Linux / macOS / Git Bash:**
+```bash
+curl -H "X-Cache-Backend: redis" http://localhost:3000/api/products/1000
+curl -H "X-Cache-Backend: memcached" http://localhost:3000/api/products/1000
+```
+
+**Windows PowerShell:**
+*Note: In PowerShell, `curl` is an alias for `Invoke-WebRequest`. Use `curl.exe` to use the actual curl binary.*
+```powershell
+curl.exe -H "X-Cache-Backend: redis" http://localhost:3000/api/products/1000
+curl.exe -H "X-Cache-Backend: memcached" http://localhost:3000/api/products/1000
+```
